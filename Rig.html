@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Training">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2c4e4e">
+<meta name="description" content="Your training log, read live from your Google Sheet.">
+<title>Training Log</title>
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAABuklEQVR42u3SQQ0AIAwEQQShpYbwgRT0YYAnNAEm2f8l7ZQaIS0rTiA4BIfgEByCQ3AIDsEhOASHBIfgEByCQ3AIDsEhOASH4JDgEByCQ3AIDsEhOASH4BAcEhyCQ3AIDsEhOASH4BAcSqu3sTE44IADDjjggENwCA7BITgEh+CAAw444IADDjjggENwCA7BITgcEQ444IADDjjggAMOOOCAAw444IADDjjggAMOOOCAAw444IADjvNHfHULDjjggAMOOOCAAw444IADDjjggAMOOOCAA44UHB4Gh4fBAQcccMABhy04bMFhCw5bcHgYHB4Gh4fB4WFwwAEHHHDAYQsOW3DYgsMWHB4Gh4fB4WFweBgccMABBxxw2ILDFhy24LAFBxxweBgcHgaHh8HhYXDAAQcccMBhCw5bcNiCwxYcHgaHh8HhYXB4GBxwwAEHHHDYgsMWHLbgsAWHh8HhYXB4GBweBgcccMABBxy24LAFhy04bMEBBxwe9hEO3RscgkNwCA7BITgEh+AQHIJDcEhwCA7BITgEh+AQHIJDcAgOCQ7BITgEh+AQHIJDcAgOwSHBITgEh+BQShP/xZVgLRqfHQAAAABJRU5ErkJggg==">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Palette: deep teal ground, warm off-white for all text, lilac for charts and accents. */
+:root {
+  --bg: #2c4e4e;
+  --card: #264545;
+  --ink: #f7f3ef;
+  --muted: #f7f3ef;
+  --line: rgba(247, 243, 239, 0.18);
+  --accent: #967bb6;
+  --accent-soft: rgba(150, 123, 182, 0.26);
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: clamp(15px, 0.4vw + 14px, 17px)/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 700; letter-spacing: 0.01em; text-wrap: balance; }
+h1 { font-size: clamp(28px, 4vw + 16px, 44px); line-height: 1; text-transform: uppercase; }
+h2 { font-size: clamp(22px, 2vw + 16px, 30px); line-height: 1.05; }
+h3 { font-size: clamp(17px, 0.6vw + 16px, 21px); text-transform: uppercase; letter-spacing: 0.04em; }
+p { margin: 0; }
+.kicker { font: 500 11px/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.masthead { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; width: 100%; max-width: 1180px; margin-inline: auto; }
+.masthead .meta { text-align: right; display: grid; justify-items: end; gap: 6px; }
+.refresh {
+  min-height: 40px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 6px;
+  background: var(--accent-soft); color: var(--ink); font: 600 13px var(--mono); letter-spacing: 0.04em; cursor: pointer;
+}
+.refresh:disabled { opacity: 0.6; cursor: progress; }
+.refresh:focus-visible, .tabbar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.refresh:active, .tabbar button:active { transform: scale(0.98); }
+#view { width: 100%; max-width: 1180px; margin-inline: auto; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+#view > * { min-width: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 4px; }
+.hero .big { font: 700 clamp(26px, 2vw + 14px, 32px)/1.05 var(--display); text-transform: uppercase; margin: 6px 0 2px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.tile .num { font: 600 clamp(24px, 2.2vw + 16px, 34px)/1.1 var(--display); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .label { font: 500 11px/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tile .sub { font-size: 12px; color: var(--muted); }
+.pill { display: inline-flex; gap: 5px; align-items: center; padding: 3px 9px; border-radius: 4px; font: 600 12px/1.4 var(--mono); white-space: nowrap; background: var(--line); color: var(--ink); }
+.pr { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); }
+.pr:first-of-type { border-top: 0; }
+.pr .val { font: 600 20px/1.1 var(--display); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hbar { display: grid; grid-template-columns: minmax(0, 110px) 1fr 28px; gap: 10px; align-items: center; margin: 9px 0; font-size: 14px; }
+.hbar .track { height: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.hbar .fill { height: 100%; background: var(--accent); }
+.hbar .n { text-align: right; font-family: var(--mono); }
+/* Readiness widget: colour shows the load state at a glance. */
+.readiness { --tone: var(--muted); border-left: 6px solid var(--tone); }
+.readiness.red { --tone: #e5484d; background: linear-gradient(0deg, rgba(229, 72, 77, 0.18), rgba(229, 72, 77, 0.18)), var(--card); }
+.readiness.green { --tone: #3fb950; background: linear-gradient(0deg, rgba(63, 185, 80, 0.18), rgba(63, 185, 80, 0.18)), var(--card); }
+.readiness.orange { --tone: #f59e0b; background: linear-gradient(0deg, rgba(245, 158, 11, 0.18), rgba(245, 158, 11, 0.18)), var(--card); }
+.readiness .pill { background: var(--tone); color: #111; }
+.readiness .big { font: 700 clamp(22px, 2vw + 12px, 28px)/1.15 var(--display); text-transform: uppercase; margin: 8px 0; }
+.notice { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 12px; border-radius: 4px; font-size: 13px; }
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .bar { fill: var(--accent); }
+.chart .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .trend { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .target-line { stroke: #BF9903; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .target-label { fill: #BF9903; font: 600 10px var(--mono); }
+/* Benchmark girls widgets: the best result is the main figure, with elite targets in gold. */
+.gw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.gw { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; }
+.gw-name { font: 600 11px/1.3 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.gw-val { font: 600 clamp(24px, 2vw + 12px, 30px)/1.1 var(--display); font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
+.gw-sub { font-size: 12px; }
+.gw-test { font-size: 12px; margin-top: 4px; }
+/* Benchmark girls: list of workout widgets, each with its description underneath. */
+/* Two widgets per row keeps the girls list short to scroll; one column only on very narrow screens. */
+.wl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+@media (max-width: 320px) { .wl { grid-template-columns: minmax(0, 1fr); } }
+.gw-info { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; font-size: 12px; display: grid; gap: 3px; }
+.gw-info p { margin: 0; }
+.gw-target { font-size: 12px; margin-top: 6px; }
+.test-next .big { font: 700 clamp(26px, 2vw + 14px, 32px)/1.05 var(--display); text-transform: uppercase; margin: 6px 0 4px; }
+.gw-gap { font-size: 12px; color: var(--muted); }
+/* Targets and predictions use gold #BF9903. */
+.gold { color: #BF9903; }
+.target { margin-top: 10px; display: grid; gap: 6px; font-size: 14px; }
+.target .trow { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.target .tbar { height: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.target .tbar div { height: 100%; background: #BF9903; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font: 10px var(--mono); }
+.empty { color: var(--muted); font-size: 14px; padding: 18px 0; text-align: center; }
+dl.legend { margin: 8px 0 0; display: grid; gap: 8px; font-size: 13px; color: var(--muted); }
+dl.legend dt { font-weight: 600; color: var(--ink); display: inline; }
+dl.legend dd { display: inline; margin: 0; }
+.tabbar {
+  position: fixed; left: 50%; transform: translateX(-50%); width: min(100%, 720px); bottom: 0; z-index: 10;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--card); border-top: 1px solid var(--line);
+}
+.tabbar button {
+  min-height: 52px; border: 0; border-radius: 6px; background: transparent; color: var(--muted);
+  font: 600 13px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+}
+.tabbar button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+/* Responsive: phones one column; tablets two columns; laptops and desktops three across for the lift charts. */
+@media (max-width: 340px) { .tile .num { font-size: 26px; } }
+@media (min-width: 720px) {
+  #view { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view > .hero, #view > .notice, #view > p, #view > .grid-2, #view > .wide { grid-column: 1 / -1; }
+  .card { padding: 20px; }
+  .hbar { grid-template-columns: 140px 1fr 36px; }
+}
+@media (min-width: 1024px) {
+  #view.progress-view { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (pointer: coarse) { .tabbar button { min-height: 56px; } .refresh { min-height: 44px; } }
+@media (hover: hover) { .tabbar button:hover { color: var(--ink); } .refresh:hover { filter: brightness(1.15); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div>
+    <p class="kicker">Personal log</p>
+    <h1>Training Log</h1>
+  </div>
+  <div class="meta">
+    <div class="small mono muted" id="source">Loading…</div>
+    <button type="button" id="refresh" class="refresh" aria-label="Refresh data from the spreadsheet">↻ Refresh</button>
+  </div>
+</header>
+
+<main id="view"></main>
+
+<nav class="tabbar" aria-label="Sections">
+  <button type="button" data-tab="stats" aria-pressed="true">Stats</button>
+  <button type="button" data-tab="trends" aria-pressed="false">Trends</button>
+  <button type="button" data-tab="progress" aria-pressed="false">Progress</button>
+  <button type="button" data-tab="load" aria-pressed="false">Load</button>
+</nav>
+
+<script>
+// ─── Settings ────────────────────────────────────────────────────────────────
+// SHEET_ID is the code in your sheet link: docs.google.com/spreadsheets/d/<SHEET_ID>/edit
+const SHEET_ID = "1XjXW4QLsOtx7UgvjVNxP2GMnB3o5RhhA";
+const TABS = { lifts: "Lift Log", sessions: "Sessions", bench: "Benchmark Log" };
+// Built-in copy of the benchmark results, used only if nothing live or saved is available.
+const BENCH_CSV = `Date,Workout,Score type (auto),Time (m:ss),Reps / rounds (total),Rx / Scaled,Load (kg),Notes,Seconds (auto),Previous Rx best (auto),Result (auto),Time cap (auto)
+26 Oct 2026,Fran,Time,3:26,,Rx,43.0,First attempt,206,,First Rx entry,
+05 Oct 2026,Diane,Time,4:30,,Rx,,,270,,First Rx entry,`;
+// The "girls" benchmark workouts. Elite targets are third-party figures (WODprep), not official CrossFit standards.
+const GIRLS = [
+  { name: "Fran", type: "time", target: 180, label: "under 3:00" },
+  { name: "Grace", type: "time", target: 120, label: "under 2:00" },
+  { name: "Helen", type: "time", target: 480, label: "under 8:00" },
+  { name: "Isabel", type: "time", target: 120, label: "under 2:00" },
+  { name: "Cindy", type: "reps", target: 24, label: "24+ rounds" },
+  { name: "Diane", type: "time", target: 240, label: "under 4:00" },
+  { name: "Elizabeth", type: "time", target: 240, label: "under 4:00" },
+  { name: "Karen", type: "time", target: 300, label: "under 5:00" },
+];
+// How often to retest, in days. Max efforts every 6 weeks at most: more often and fatigue hides the result.
+// Olympic lifts and short benchmarks every 6 weeks; heavy strength and long benchmarks every 8 weeks.
+const LIFT_TEST_DAYS = {
+  "Snatch": 42, "Squat Snatch": 42, "Clean": 42, "Clean & Jerk": 42, "Power Snatch": 42, "Power Clean": 42, "Jerk (Split or Push)": 42,
+  "Deadlift": 56, "Back Squat": 56, "Front Squat": 56, "Overhead Squat": 56, "Strict Press": 56, "Bench Press": 56, "Thruster": 56,
+};
+const GIRL_TEST_DAYS = { "Fran": 42, "Grace": 42, "Isabel": 42, "Diane": 42, "Elizabeth": 42, "Karen": 42, "Helen": 56, "Cindy": 56 };
+// Next-test status from the last test date. Never-tested items sort as most urgent.
+function testStatus(last, days, now) {
+  if (!last) return { never: true, overdue: Infinity, text: "–" };
+  const due = addDays(sod(last), days);
+  const left = Math.round((due - sod(now)) / DAY);
+  if (left > 0) return { due, overdue: -left, text: `Next test in ${left} day${left === 1 ? "" : "s"} · ${fDate(due)}` };
+  if (left === 0) return { due, overdue: 0, text: "Test today" };
+  return { due, overdue: -left, text: `Test overdue by ${-left} day${left === -1 ? "" : "s"}` };
+}
+const latestDate = recs => recs.length ? recs.reduce((a, b) => (b.date > a.date ? b : a)).date : null;
+// Every tracked lift and girl workout, ranked by how urgently it needs a test.
+function testItems(d) {
+  const liftNames = [...Object.keys(TARGETS), ...d.summary.prs.map(p => p.lift).filter(n => !TARGETS[n])];
+  const items = [];
+  for (const name of liftNames) {
+    const last = latestDate(d.lifts.records.filter(r => r.lift === name));
+    items.push({ name, kind: "lift", order: items.length, ...testStatus(last, LIFT_TEST_DAYS[name] ?? 56, d.now) });
+  }
+  for (const g of GIRLS) {
+    const last = latestDate(d.bench.records.filter(r => r.workout.toLowerCase() === g.name.toLowerCase()));
+    items.push({ name: g.name, kind: "girl", order: items.length, ...testStatus(last, GIRL_TEST_DAYS[g.name] ?? 56, d.now) });
+  }
+  return items.sort((a, b) => (a.overdue === b.overdue ? a.order - b.order : b.overdue > a.overdue ? 1 : -1));
+}
+function testNextCard(d) {
+  const items = testItems(d);
+  const top = items[0];
+  const next = items.slice(1, 4).map(i => esc(i.name)).join(" · ");
+  return `<section class="card wide test-next">
+    <div class="card-head"><h3>Test next</h3><span class="pill">${top.kind === "girl" ? "Benchmark" : "Lift"}</span></div>
+    <p class="big gold">${esc(top.name)}</p>
+    <p class="small">${esc(top.text)}</p>
+    <p class="small muted">Then: ${next}</p>
+  </section>`;
+}
+const REFRESH_MS = 5 * 60 * 1000;
+const SAVE_KEY = "training-log:last-live:v1";
+// Key movements always appear on the Progress tab, even before any entries exist.
+const KEY_LIFTS = ["Snatch", "Squat Snatch", "Power Snatch", "Clean & Jerk", "Power Clean", "Back Squat", "Front Squat", "Overhead Squat", "Deadlift", "Strict Press", "Bench Press"];
+// Built-in copy of the data, used only if the live sheet and the saved copy are both unavailable.
+const SNAPSHOT_DATE = "30 Oct 2026";
+const LIFT_CSV = `Date,Lift,Weight (kg),Reps,Est. 1RM (kg),Category,Notes,Chart seq (auto)
+19 Mar 2024,Snatch,60.0,1,60.0,Olympic,,
+06 Aug 2024,Snatch,72.0,1,72.0,Olympic,,
+24 Sep 2024,Snatch,75.0,1,75.0,Olympic,,
+05 Nov 2024,Snatch,78.0,1,78.0,Olympic,,
+26 Nov 2024,Snatch,80.0,1,80.0,Olympic,,
+22 Nov 2025,Snatch,90.0,1,90.0,Olympic,,
+26 Oct 2026,Thruster,90.0,5,105.0,Strength,,
+23 Oct 2026,Bench Press,120.0,5,140.0,Strength,,
+24 Jan 2026,Bench Press,135.0,3,148.5,Strength,,
+06 Aug 2024,Clean & Jerk,100.0,1,100.0,Olympic,,
+26 Nov 2024,Clean & Jerk,115.0,1,115.0,Olympic,,
+22 Nov 2024,Clean & Jerk,125.0,1,125.0,Olympic,,
+31 Aug 2024,Clean,110.0,1,110.0,Olympic,,
+24 Sep 2024,Clean,120.0,1,120.0,Olympic,,
+18 Oct 2025,Clean,130.0,1,130.0,Olympic,,
+29 Aug 2024,Power Snatch,56.0,1,56.0,Olympic variation,,
+11 Sep 2025,Power Snatch,70.0,1,70.0,Olympic variation,,
+29 Jul 2024,Back Squat,120.0,10,160.0,Strength,,
+19 Aug 2024,Back Squat,160.0,8,202.7,Strength,,
+16 Dec 2024,Back Squat,170.0,2,181.3,Strength,,
+10 Oct 2026,Back Squat,175.0,3,192.5,Strength,,
+11 Jul 2025,Jerk (Split or Push),114.0,1,114.0,Olympic,,
+30 Oct 2026,Overhead Squat,60.0,3,66.0,Strength,,
+30 Oct 2026,Squat Snatch,80.0,1,80.0,Olympic variation,"Could push more, technique issue not strength",1
+10 Oct 2026,Power Clean,100.0,3,110.0,Olympic variation,,
+30 Oct 2026,Front Squat,60.0,10,80.0,Strength,,
+29 Oct 2026,Strict Press,70.0,6,84.0,Strength,,`;
+const SESSION_CSV = `"Date","Session type","Workout format","Workout / movements","Main loads (kg)","Duration (min)","Score / result","Total reps or rounds","Effort (RPE 1-10)","Recovery (1-5)","Notes","Example?","Week starting (auto)"
+"25 Sep 2026","Running","Max Effort / Test","3k for time","","13.22","N/A","","8","4","ATHX Testing Session","","21 Sep 26"
+"29 Sep 2026","CrossFit","EMOM","Hang + TnG power snatch; Calorie ski; Hang + TnG power clean; Calorie bike erg","RPE 7 (no kg stated)","25.00","N/A","80 reps + 165 cal","8","4","EMOM 10 + 5 min rest + EMOM 10","","28 Sep 26"
+"05 Oct 2026","Conditioning","Intervals","1000m row/ski or 2000m bike (rotating); 400m run; Burpee box jumps; DB snatches","22.5 (DB)","37.50","N/A","3 rounds (135 reps + machine/run)","8","4","Listed as 15/22.5 kg, heavier taken","","05 Oct 26"
+"06 Oct 2026","CrossFit","AMRAP","300m run; Toes-to-bar; Calorie row; Pull-ups; DB reverse flys; Banded tricep pushdowns; Weighted Russian twists","Bodyweight / N/A","23.00","N/A","N/A","8","4","15 min AMRAP + 8 min accessory for quality","","05 Oct 26"
+"10 Oct 2026","Competition / test","Strength Sets","3RM Squats & Clean and Jerks","60","12.00","175kg","","9","3","","","05 Oct 26"
+"10 Oct 2026","Competition / test","Intervals","14 TtB, 9 synchro Burpee box jumps, 14 synchro pull-ups, Max sandbags squats","40","9.00","N/A","","9","3","","","05 Oct 26"
+"10 Oct 2026","Competition / test","Max Effort / Test","CFV Workout 3","22.5","16.00","N/A","","10","2","","","05 Oct 26"
+"12 Oct 2026","Mobility / recovery","Steady State","Shoulder Recovery Movements","22.5","60.00","N/A","","7","5","","","12 Oct 26"
+"13 Oct 2026","CrossFit","Intervals","Calorie row + lateral burpees over rower; Calorie ski + burpee to platform; Calorie bike + burpee to touch","Bodyweight","30.00","N/A","270 total (135 cal + 135 burpees)","8","4","Every 10:00 x 3; 8 min cap per set","","12 Oct 26"
+"14 Oct 2026","Mobility / recovery","Steady State","Shoulder Recovery Movements","22.5","60.00","N/A","","7","5","","","12 Oct 26"
+"15 Oct 2026","CrossFit","Intervals","Calorie row; DB bench press; Max calorie row; Banded tricep pushdowns; Chinese plank; Ring support hold","22.5 DBs / band / bodyweight","29.00","N/A","4 sets (60 cal + 60 reps + max cal) + 3 EMOM rounds","8","5","2:30 on/2:30 off x 4 + EMOM 9","","12 Oct 26"
+"18 Oct 2026","Conditioning","EMOM","Ski + dual DB snatches; Row + burpees over rower; Echo calories + box jumps","15 (dual DBs)","36.00","N/A","9 rounds (135 reps + machine)","8","5","E4MOM x 9 alternating 3 stations; listed as 10/15 kg, heavier taken","","12 Oct 26"
+"20 Oct 2026","Mobility / recovery","Steady State","Shoulder Recovery Movements","22.5","60.00","N/A","","7","5","","","19 Oct 26"
+"21 Oct 2026","CrossFit","EMOM","Strict press; Strict chest-to-bar pull-ups; Calorie ski/row/bike","43 / bodyweight","31.00","N/A","85 reps + 192 cal","6","5","10-1 press ladder (15 min cap) + EMOM 8 + E2:00 x 4","","19 Oct 26"
+"22 Oct 2026","Mobility / recovery","Steady State","Shoulder Recovery Movements","22.5","60.00","N/A","","7","5","","","19 Oct 26"
+"23 Oct 2026","CrossFit","Intervals","1,600m run; Bench press, build to 5RM","5RM bench (build)","20.00","N/A","1,600m + 5RM","6","5","CrossFit.com 14/09/26; 10 min run window + 10 min bench","","19 Oct 26"
+"24 Oct 2026","CrossFit","AMRAP","Calorie row; Wall balls; Max pull-ups; Push-ups; Max front squats","9 / 60","33.00","N/A","2 x (5 rounds + max reps)","8","5","2 x 15 min AMRAP + 3 min rest; in pairs","","19 Oct 26"
+"26 Oct 2026","CrossFit","Strength Sets","Thrusters (build to heavy 3); Fran: Thrusters; Pull-ups","Heavy 3 (RPE 6-10) / 43","22.50","N/A","5x3 + 90 reps","8","5","12.5 min strength (E2:30 x 5) + 10 min Fran cap","","26 Oct 26"
+"28 Oct 2026","Conditioning","EMOM","Bike Erg + E5MOM 5 Bar Muscle Ups","","70.00","56","14 Rounds","8","3","","","26 Oct 26"
+"29 Oct 2026","Mobility / recovery","Steady State","Shoulder Recovery Movements","22.5","60.00","N/A","N/A","6","4","","","26 Oct 26"
+"30 Oct 2026","Strength","Skill Work","Squat Snatch","80","60.00","80kg","8","8","5","","","26 Oct 26"`;
+
+// ─── Parsing: every bad cell is skipped and counted, never fatal ─────────────
+const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+const norm = s => String(s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+const str = v => String(v ?? "").trim();
+
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f.length || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+function makeDate(y, m, d) { const t = new Date(y, m, d); return t.getFullYear() === y && t.getMonth() === m && t.getDate() === d ? t : null; }
+function parseDate(v) {
+  const s = str(v); if (!s) return null;
+  let m = s.match(/^(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{4}|\d{2})$/);
+  if (m) { const mo = MONTHS[m[2].toLowerCase()]; if (mo === undefined) return null; return makeDate(m[3].length === 2 ? 2000 + +m[3] : +m[3], mo, +m[1]); }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return makeDate(+m[1], +m[2] - 1, +m[3]);
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (m) return makeDate(+m[3], +m[2] - 1, +m[1]);
+  return null;
+}
+function toNumber(v) {
+  if (v == null) return null;
+  const s = String(v).replace(/,/g, "").replace(/\s*kg$/i, "").trim();
+  if (!s || /^(n\/?a|none|-+)$/i.test(s)) return null;
+  const n = Number(s); return Number.isFinite(n) ? n : null;
+}
+function toMinutes(v) { const s = str(v); const hm = s.match(/^(\d+):(\d{2})$/); return hm ? +hm[1] * 60 + +hm[2] : toNumber(s); }
+function findTable(rows, required) {
+  const want = required.map(norm);
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].map(norm);
+    if (want.every(w => cells.some(c => c === w || c.startsWith(w) || c.endsWith(" " + w)))) return { idx: i, headers: cells };
+  }
+  return null;
+}
+function colOf(headers, name) {
+  const n = norm(name);
+  let i = headers.findIndex(h => h === n);
+  if (i < 0) i = headers.findIndex(h => h.startsWith(n));
+  if (i < 0) i = headers.findIndex(h => h.endsWith(" " + n));
+  return i;
+}
+function readRecords(text, required, map, help) {
+  const rows = parseCSV(String(text ?? ""));
+  const t = findTable(rows, required);
+  if (!t) return { records: [], skipped: 0, reasons: {}, error: help };
+  const get = (row, name) => { const i = colOf(t.headers, name); return i >= 0 ? row[i] : undefined; };
+  const records = [], reasons = {}; let skipped = 0;
+  for (const row of rows.slice(t.idx + 1)) {
+    if (row.every(x => str(x) === "")) continue;
+    if (/^yes$/i.test(str(get(row, "example")))) continue;
+    const r = map(row, get);
+    if (r.error) { skipped++; reasons[r.error] = (reasons[r.error] || 0) + 1; } else records.push(r.value);
+  }
+  return { records, skipped, reasons, error: null };
+}
+function parseLifts(text) {
+  const out = readRecords(text, ["Date", "Lift", "Weight"], (row, get) => {
+    const date = parseDate(get(row, "date")); if (!date) return { error: "missing or unreadable date" };
+    const lift = str(get(row, "lift")); if (!lift) return { error: "missing lift name" };
+    const weight = toNumber(get(row, "weight")); if (weight == null || weight <= 0) return { error: "missing weight" };
+    const reps = toNumber(get(row, "reps")) ?? 1;
+    let est = toNumber(get(row, "est")); if (est == null) est = reps > 1 ? weight * (1 + reps / 30) : weight;
+    return { value: { date, lift, weight, reps, est1rm: Math.round(est * 10) / 10 } };
+  }, 'Could not find the header row (Date, Lift, Weight). Check the tab is named "Lift Log".');
+  out.records.sort((a, b) => a.date - b.date); return out;
+}
+function parseSessions(text) {
+  const out = readRecords(text, ["Date", "Session type", "Effort"], (row, get) => {
+    const date = parseDate(get(row, "date")); if (!date) return { error: "missing or unreadable date" };
+    const rpe = toNumber(get(row, "effort")), rec = toNumber(get(row, "recovery")), dur = toMinutes(get(row, "duration"));
+    return { value: {
+      date, type: str(get(row, "session type")) || "Unspecified", movements: str(get(row, "workout / movements")),
+      durationMin: dur != null && dur >= 0 ? dur : null,
+      rpe: rpe != null && rpe >= 1 && rpe <= 10 ? rpe : null,
+      recovery: rec != null && rec >= 1 && rec <= 5 ? rec : null,
+    } };
+  }, 'Could not find the header row (Date, Session type, Effort). Check the tab is named "Sessions".');
+  out.records.sort((a, b) => a.date - b.date); return out;
+}
+
+// "m:ss" or "h:mm:ss" -> seconds.
+function parseClock(v) {
+  const s = str(v);
+  const hms = s.match(/^(\d+):(\d{2}):(\d{2})$/); if (hms) return +hms[1] * 3600 + +hms[2] * 60 + +hms[3];
+  const ms = s.match(/^(\d+):(\d{2})$/); if (ms) return +ms[1] * 60 + +ms[2];
+  return null;
+}
+// Benchmark log: keeps Rx entries only (the only ones that count for PRs).
+function parseBench(text) {
+  const out = readRecords(text, ["Date", "Workout", "Time"], (row, get) => {
+    const date = parseDate(get(row, "date")); if (!date) return { error: "missing or unreadable date" };
+    const workout = str(get(row, "workout")); if (!workout) return { error: "missing workout name" };
+    const seconds = toNumber(get(row, "seconds")) ?? parseClock(get(row, "time"));
+    const reps = toNumber(get(row, "reps"));
+    const rx = /^rx$/i.test(str(get(row, "rx")));
+    return { value: { date, workout, seconds, reps, rx } };
+  }, 'Could not find the header row (Date, Workout, Time). Check the tab is named "Benchmark Log".');
+  out.records = out.records.filter(r => r.rx);
+  return out;
+}
+
+// ─── Calculations ───────────────────────────────────────────────────────────
+const DAY = 86400000;
+const sod = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const ago = (now, d) => Math.round((sod(now) - sod(d)) / DAY);
+const dayKey = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const mondayOf = d => { const s = sod(d); return addDays(s, -((s.getDay() + 6) % 7)); };
+const sum = xs => xs.reduce((a, b) => a + b, 0);
+const avg = xs => xs.length ? sum(xs) / xs.length : null;
+const r1 = n => n == null ? null : Math.round(n * 10) / 10;
+const sessionLoad = s => s.durationMin != null && s.rpe != null ? s.durationMin * s.rpe : null;
+
+function summarize(sessions, lifts, now) {
+  const in30 = sessions.filter(s => ago(now, s.date) >= 0 && ago(now, s.date) < 30);
+  const in7 = sessions.filter(s => ago(now, s.date) >= 0 && ago(now, s.date) < 7);
+  const last = sessions.at(-1) ?? null;
+  const prMap = new Map();
+  for (const l of lifts) {
+    const c = prMap.get(l.lift);
+    if (!c) prMap.set(l.lift, { lift: l.lift, best: l, count: 1 });
+    else { c.count++; if (l.est1rm > c.best.est1rm || (l.est1rm === c.best.est1rm && l.date > c.best.date)) c.best = l; }
+  }
+  return {
+    total: sessions.length,
+    s7: in7.length, s30: in30.length,
+    min30: sum(in30.map(s => s.durationMin ?? 0)),
+    rpe30: r1(avg(in30.map(s => s.rpe).filter(v => v != null))),
+    rec30: r1(avg(in30.map(s => s.recovery).filter(v => v != null))),
+    last, sinceLast: last ? ago(now, last.date) : null,
+    prs: [...prMap.values()].sort((a, b) => b.best.est1rm - a.best.est1rm),
+    future: sessions.filter(s => ago(now, s.date) < 0).length + lifts.filter(l => ago(now, l.date) < 0).length,
+  };
+}
+function weeklyTrend(sessions, now) {
+  const past = sessions.filter(s => ago(now, s.date) >= 0);
+  if (!past.length) return [];
+  const first = mondayOf(past[0].date), thisWeek = mondayOf(now);
+  const weeks = [], byKey = new Map();
+  for (let w = first; w <= thisWeek; w = addDays(w, 7)) { const row = { start: w, sessions: 0, minutes: 0 }; weeks.push(row); byKey.set(dayKey(w), row); }
+  for (const s of past) { const row = byKey.get(dayKey(mondayOf(s.date))); if (row) { row.sessions++; row.minutes += s.durationMin ?? 0; } }
+  return weeks;
+}
+function typeCounts(sessions) {
+  const m = new Map(); for (const s of sessions) m.set(s.type, (m.get(s.type) || 0) + 1);
+  return [...m].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+}
+function progress(lifts, now) {
+  const groups = new Map();
+  for (const l of lifts) { if (!groups.has(l.lift)) groups.set(l.lift, []); groups.get(l.lift).push(l); }
+  for (const n of KEY_LIFTS) if (!groups.has(n)) groups.set(n, []);
+  const out = [];
+  for (const [lift, entries] of groups) {
+    const past = entries.filter(e => ago(now, e.date) >= 0);
+    if (past.length < 2) {
+      out.push({ lift, status: past.length ? "single" : "none", last: past[0]?.est1rm ?? null, lastDate: past[0]?.date ?? null });
+      continue;
+    }
+    const recent = past.filter(e => ago(now, e.date) < 90);
+    const prior = past.filter(e => { const a = ago(now, e.date); return a >= 90 && a < 180; });
+    const recentBest = recent.length ? Math.max(...recent.map(e => e.est1rm)) : null;
+    const priorBest = prior.length ? Math.max(...prior.map(e => e.est1rm)) : null;
+    let status = "stale", change = null;
+    if (recentBest != null && priorBest == null) status = "new";
+    if (recentBest != null && priorBest != null) {
+      change = r1((recentBest - priorBest) / priorBest * 100);
+      status = change >= 1 ? "up" : change <= -1 ? "down" : "flat";
+    }
+    const byMonth = new Map();
+    for (const e of past) { const k = `${e.date.getFullYear()}-${e.date.getMonth()}`; const c = byMonth.get(k); if (!c || e.est1rm > c.value) byMonth.set(k, { date: e.date, value: e.est1rm }); }
+    out.push({ lift, status, change, recentBest, priorBest, series: [...byMonth.values()].sort((a, b) => a.date - b.date) });
+  }
+  return out;
+}
+// Sums values per day for the last `span` days, oldest first.
+function dailyTotals(records, valueOf, dateOf, now, span) {
+  const today = sod(now), out = [];
+  for (let i = span - 1; i >= 0; i--) out.push({ date: addDays(today, -i), value: 0 });
+  const idx = new Map(out.map(b => [dayKey(b.date), b]));
+  for (const r of records) { const b = idx.get(dayKey(dateOf(r))); if (b) b.value += valueOf(r); }
+  return out;
+}
+// Trailing 7-day average; rest days count as zero.
+function rolling(values, win = 7) {
+  return values.map((_, i) => values.slice(Math.max(0, i - win + 1), i + 1).reduce((a, b) => a + b, 0) / win);
+}
+
+// ─── Charts (plain SVG, coloured by the CSS tokens above) ─────────────────────
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const short = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function barChart(labels, values, title, fmt = v => v) {
+  if (!values.length) return '<p class="empty">No data yet.</p>';
+  const W = 320, H = 170, p = { l: 30, r: 6, t: 12, b: 22 }, iw = W - p.l - p.r, ih = H - p.t - p.b;
+  const max = Math.max(1, ...values), n = values.length, band = iw / n, bw = Math.max(2, band * 0.7), step = Math.ceil(n / 6);
+  let s = "";
+  values.forEach((v, i) => {
+    const h = v > 0 ? Math.max(2, v / max * ih) : 0, x = p.l + i * band + (band - bw) / 2, y = p.t + ih - h;
+    s += `<rect class="bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1"><title>${esc(labels[i])}: ${esc(fmt(v))}</title></rect>`;
+    if (i % step === 0) s += `<text class="axis" x="${(x + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(labels[i])}</text>`;
+  });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
+    <line class="grid" x1="${p.l}" x2="${W - p.r}" y1="${p.t + ih}" y2="${p.t + ih}"/>
+    <text class="axis" x="${p.l - 4}" y="${p.t + 4}" text-anchor="end">${esc(fmt(max))}</text>
+    <text class="axis" x="${p.l - 4}" y="${p.t + ih}" text-anchor="end">0</text>${s}</svg>`;
+}
+function lineChart(points, title, target) {
+  if (points.length < 2) return '<p class="empty">Needs at least two results to draw a trend.</p>';
+  const W = 320, H = 180, p = { l: 38, r: 10, t: 14, b: 24 }, iw = W - p.l - p.r, ih = H - p.t - p.b;
+  const t0 = points[0].date.getTime(), span = Math.max(1, points.at(-1).date.getTime() - t0);
+  let lo = Math.min(...points.map(q => q.value)), hi = Math.max(...points.map(q => q.value));
+  if (target) { lo = Math.min(lo, target); hi = Math.max(hi, target); }
+  if (hi === lo) { lo -= 5; hi += 5; }
+  const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  const x = t => p.l + (t - t0) / span * iw, y = v => p.t + ih - (v - lo) / (hi - lo) * ih;
+  const d = points.map((q, i) => `${i ? "L" : "M"}${x(q.date.getTime()).toFixed(1)} ${y(q.value).toFixed(1)}`).join(" ");
+  const dots = points.map(q => `<circle class="dot" cx="${x(q.date.getTime()).toFixed(1)}" cy="${y(q.value).toFixed(1)}" r="3.5"><title>${esc(short(q.date))}: ${Math.round(q.value)} kg</title></circle>`).join("");
+  const ticks = [lo + pad, (lo + hi) / 2, hi - pad].map(v => `<text class="axis" x="${p.l - 6}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end">${Math.round(v)}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
+    <line class="grid" x1="${p.l}" x2="${W - p.r}" y1="${p.t + ih}" y2="${p.t + ih}"/>${ticks}
+    <path class="line" d="${d}"/>${dots}
+    ${target ? `<line class="target-line" x1="${p.l}" x2="${W - p.r}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}"/><text class="target-label" x="${W - p.r}" y="${(y(target) - 5).toFixed(1)}" text-anchor="end">Target ${target} kg</text>` : ""}
+    <text class="axis" x="${p.l}" y="${H - 6}">${esc(short(points[0].date))}</text>
+    <text class="axis" x="${W - p.r}" y="${H - 6}" text-anchor="end">${esc(short(points.at(-1).date))}</text></svg>`;
+}
+function barLineChart(labels, bars, line, title, fmt = v => v) {
+  const W = 320, H = 190, p = { l: 34, r: 6, t: 12, b: 22 }, iw = W - p.l - p.r, ih = H - p.t - p.b;
+  const max = Math.max(1, ...bars, ...line);
+  const n = bars.length, band = iw / n, bw = Math.max(2, band * 0.6), step = Math.ceil(n / 6);
+  const X = i => p.l + i * band + band / 2, Y = v => p.t + ih - (v / max) * ih;
+  let s = "";
+  bars.forEach((v, i) => {
+    const h = v > 0 ? Math.max(1, v / max * ih) : 0;
+    s += `<rect class="bar" x="${(X(i) - bw / 2).toFixed(1)}" y="${(p.t + ih - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1"><title>${esc(labels[i])}: ${esc(fmt(v))}</title></rect>`;
+    if (i % step === 0) s += `<text class="axis" x="${X(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(labels[i])}</text>`;
+  });
+  const path = line.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}">
+    <line class="grid" x1="${p.l}" x2="${W - p.r}" y1="${p.t + ih}" y2="${p.t + ih}"/>
+    <text class="axis" x="${p.l - 4}" y="${p.t + 4}" text-anchor="end">${esc(fmt(max))}</text>
+    <text class="axis" x="${p.l - 4}" y="${p.t + ih}" text-anchor="end">0</text>
+    ${s}<path class="trend" d="${path}"/></svg>`;
+}
+
+// ─── Views ───────────────────────────────────────────────────────────────────
+const f1 = n => n == null ? "–" : Number.isInteger(n) ? String(n) : n.toFixed(1);
+const fDate = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const tile = (label, value, sub) => `<div class="tile"><div class="label">${esc(label)}</div><div class="num">${esc(value)}</div><div class="sub">${esc(sub)}</div></div>`;
+function issues(d) {
+  const m = [];
+  if (d.lifts.error) m.push(`Lift Log: ${d.lifts.error}`);
+  if (d.sessions.error) m.push(`Sessions: ${d.sessions.error}`);
+  for (const [name, t] of [["Lift Log", d.lifts], ["Sessions", d.sessions]])
+    if (t.skipped) m.push(`${name}: ${t.skipped} row(s) left out (${Object.entries(t.reasons).map(([k, v]) => `${v} ${k}`).join(", ")}).`);
+  return m.length ? `<div class="notice">${m.map(esc).join("<br>")}</div>` : "";
+}
+const fmtClock = s => {
+  if (s == null) return "–";
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.round(s % 60);
+  const ss = String(sec).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+};
+// One small widget per girl workout: best Rx result as the main figure, elite target in gold beneath it.
+function girlWidget(g, records, now) {
+  const mine = records.filter(r => r.workout.toLowerCase() === g.name.toLowerCase());
+  let best = null;
+  if (g.type === "time") {
+    const timed = mine.filter(r => r.seconds != null);
+    if (timed.length) best = timed.reduce((a, b) => (b.seconds < a.seconds ? b : a));
+  } else {
+    const scored = mine.filter(r => r.reps != null);
+    if (scored.length) best = scored.reduce((a, b) => (b.reps > a.reps ? b : a));
+  }
+  let value = "–", sub = "", gap = "";
+  if (best) {
+    value = g.type === "time" ? fmtClock(best.seconds) : `${best.reps} rds`;
+    sub = fDate(best.date);
+    if (!g.target) {
+      gap = "";
+    } else if (g.type === "time") {
+      const diff = best.seconds - g.target;
+      gap = diff > 0 ? `${fmtClock(diff)} to go` : "Elite level reached";
+    } else {
+      const diff = g.target - best.reps;
+      gap = diff > 0 ? `${diff} rounds to go` : "Elite level reached";
+    }
+  }
+  return `<article class="gw">
+    <div class="gw-name">${esc(g.name)}</div>
+    <div class="gw-val">${esc(value)}</div>
+    <div class="gw-sub muted">${esc(sub)}</div>
+    <div class="gw-test">${esc(testStatus(latestDate(mine), GIRL_TEST_DAYS[g.name] ?? 56, now).text)}</div>
+    ${g.target ? `<div class="gw-target">Elite <strong class="gold">${esc(g.label)}</strong></div>` : ""}
+    ${gap ? `<div class="gw-gap">${esc(gap)}</div>` : ""}
+    <div class="gw-info">
+      <p><strong>${esc(g.info?.format ?? "")}</strong></p>
+      <p>${esc(g.info?.movements ?? "")}</p>
+      ${(() => {
+        const rx = g.info?.rx && !/^no weights$/i.test(g.info.rx) ? `Rx: ${esc(g.info.rx)}` : "";
+        const cap = g.info?.cap ? `cap ${esc(g.info.cap)}` : "";
+        const line = [rx, cap].filter(Boolean).join(" · ");
+        return line ? `<p class="muted">${line}</p>` : "";
+      })()}
+    </div>
+  </article>`;
+}
+// Each workout from the library, with its elite target where we have one.
+function girlSpec(w) {
+  const g = GIRLS.find(x => x.name === w.name);
+  if (g) return { ...g, info: w };
+  return { name: w.name, type: /^for time/i.test(w.format) ? "time" : "reps", target: null, label: null, info: w };
+}
+function girlsCard(d) {
+  return `<section class="card wide">
+    <div class="card-head"><h3>Benchmark girls</h3></div>
+    <p class="small muted" style="margin-bottom:8px">Your best Rx result, the workout, and when to test next. Gold is the elite figure, from WODprep rather than official CrossFit standards.</p>
+    <div class="wl">${WORKOUTS.map(w => girlWidget(girlSpec(w), d.bench.records, d.now)).join("")}</div>
+  </section>`;
+}
+// One small widget per lift: best estimated 1RM as the main figure, with the target and predicted date in gold.
+function liftWidget(name, entries, now) {
+  const target = TARGETS[name];
+  const testLine = testStatus(latestDate(entries), LIFT_TEST_DAYS[name] ?? 56, now).text;
+  const cur = entries.length ? entries.reduce((a, b) => (b.est1rm > a.est1rm ? b : a)) : null;
+  const value = cur ? `${f1(cur.est1rm)} kg` : "–";
+  const sub = cur ? fDate(cur.date) : "";
+  let targetLine = "", gap = "", pred = "";
+  if (target) {
+    targetLine = `<div class="gw-target">Target <strong class="gold">${target} kg</strong></div>`;
+    if (cur) {
+      const diff = target - cur.est1rm;
+      gap = diff > 0 ? `${f1(diff)} kg to go` : "Target reached";
+      if (diff > 0) {
+        const p = predictDate(entries, target, now);
+        pred = `<div class="gw-gap">Predicted <strong class="gold">${esc(p instanceof Date ? fDate(p) : p ?? "–")}</strong></div>`;
+      }
+    }
+  }
+  return `<article class="gw">
+    <div class="gw-name">${esc(name)}</div>
+    <div class="gw-val">${esc(value)}</div>
+    <div class="gw-sub muted">${esc(sub)}</div>
+    <div class="gw-test">${esc(testLine)}</div>
+    ${targetLine}
+    ${gap ? `<div class="gw-gap">${esc(gap)}</div>` : ""}
+    ${pred}
+  </article>`;
+}
+function liftsCard(d) {
+  const names = [...Object.keys(TARGETS), ...d.summary.prs.map(p => p.lift).filter(n => !TARGETS[n])];
+  return `<section class="card wide">
+    <div class="card-head"><h3>Lift personal bests</h3></div>
+    <p class="small muted" style="margin-bottom:8px">Best estimated 1RM for each lift. Gold is your target and predicted date, as on the Progress tab.</p>
+    <div class="gw-grid">${names.map(n => liftWidget(n, d.lifts.records.filter(r => r.lift === n), d.now)).join("")}</div>
+  </section>`;
+}
+function renderStats(d) {
+  const s = d.summary, l = s.last;
+  const since = s.sinceLast == null ? "" : s.sinceLast === 0 ? "today" : s.sinceLast === 1 ? "yesterday" : `${s.sinceLast} days ago`;
+  const hero = l
+    ? `<p class="kicker">Last session · ${esc(fDate(l.date))} · ${esc(since)}</p>
+       <p class="big">${esc(l.type)}${l.movements ? " · " + esc(l.movements) : ""}</p>`
+    : `<p class="big">No sessions yet</p><p class="muted small">Log a session to see it here.</p>`;
+  return `${issues(d)}
+    ${testNextCard(d)}
+    <section class="card hero wide">${hero}</section>
+    <section class="grid-2">
+      ${tile("Sessions", s.s7, "last 7 days")}${tile("Sessions", s.s30, "last 30 days")}
+      ${tile("Minutes", s.min30, "last 30 days")}${tile("Avg effort", f1(s.rpe30), "RPE 1–10, 30 days")}
+      ${tile("Avg recovery", f1(s.rec30), "scale 1–5, 30 days")}${tile("All sessions", s.total, "since you started")}
+    </section>
+    ${s.future ? `<p class="small muted wide">${s.future} entr${s.future === 1 ? "y is" : "ies are"} dated after today and left out of the 30-day figures.</p>` : ""}
+    ${girlsCard(d)}
+    ${liftsCard(d)}`;
+}
+function renderTrends(d) {
+  const weeks = weeklyTrend(d.sessions.records, d.now);
+  if (!weeks.length) return `${issues(d)}<section class="card"><p class="empty">Trends appear once a few sessions are logged.</p></section>`;
+  const types = typeCounts(d.sessions.records), maxT = Math.max(1, ...types.map(t => t.count));
+  const labels = weeks.map(w => short(w.start));
+  return `${issues(d)}
+    <section class="card"><div class="card-head"><h3>Sessions per week</h3></div>
+      <p class="small muted" style="margin-bottom:6px">Every week since your first session. Gaps are weeks with no training.</p>
+      ${barChart(labels, weeks.map(w => w.sessions), "Sessions per week")}</section>
+    <section class="card"><div class="card-head"><h3>Minutes per week</h3></div>
+      ${barChart(labels, weeks.map(w => Math.round(w.minutes)), "Minutes per week")}</section>
+    <section class="card wide"><div class="card-head"><h3>Session types</h3></div>
+      ${types.map(t => `<div class="hbar"><span>${esc(t.type)}</span><div class="track"><div class="fill" style="width:${t.count / maxT * 100}%"></div></div><span class="n">${t.count}</span></div>`).join("")}</section>`;
+}
+const LABELS = { up: "Improving", down: "Dropping", flat: "Holding steady", new: "Only recent data so far", stale: "No entry in the last 90 days" };
+const ARROWS = { up: "▲", down: "▼", flat: "▶", new: "●", stale: "○" };
+// Target weights (kg) for each lift. Compared against the best estimated 1RM.
+const TARGETS = {
+  "Snatch": 110, "Squat Snatch": 100, "Clean": 160, "Clean & Jerk": 150, "Deadlift": 250,
+  "Back Squat": 220, "Power Snatch": 100, "Power Clean": 135, "Strict Press": 90, "Bench Press": 150,
+  "Front Squat": 185, "Overhead Squat": 150, "Jerk (Split or Push)": 160, "Thruster": 120,
+};
+const DAYS_PER_YEAR = 365.25;
+// Straight-line trend through every past entry for one lift. Returns the date the trend reaches the target,
+// or null when there isn't enough data (fewer than 3 entries over at least 60 days) or the trend is flat or falling.
+function predictDate(entries, target, now) {
+  const pts = entries.filter(e => ago(now, e.date) >= 0).map(e => ({ t: e.date.getTime() / DAY, y: e.est1rm }));
+  if (pts.length < 3) return null;
+  const ts = pts.map(p => p.t);
+  if (Math.max(...ts) - Math.min(...ts) < 60) return null;
+  const n = pts.length, mt = sum(ts) / n, my = sum(pts.map(p => p.y)) / n;
+  const cov = sum(pts.map(p => (p.t - mt) * (p.y - my))), varT = sum(pts.map(p => (p.t - mt) ** 2));
+  const slope = cov / varT;
+  if (!(slope > 0)) return null;
+  // Predictions rely on recent data: nothing logged in the last 12 months means no prediction.
+  if (now.getTime() / DAY - Math.max(...ts) > 365) return null;
+  const nowDay = now.getTime() / DAY;
+  const hitDay = mt + (target - my) / slope;
+  // The trend already passed the target, but you haven't reached it yet, so there's no sensible date.
+  if (hitDay < nowDay) return null;
+  const daysAway = Math.max(0, hitDay - nowDay);
+  if (daysAway > 5 * DAYS_PER_YEAR) return "over 5 years";
+  return new Date(now.getTime() + daysAway * DAY);
+}
+function targetBlock(lift, entries, now) {
+  const target = TARGETS[lift];
+  if (!target) return '<p class="small muted">No target set for this lift.</p>';
+  const current = entries.length ? Math.max(...entries.map(e => e.est1rm)) : null;
+  const togo = current == null ? target : Math.max(0, target - current);
+  const pct = current == null ? 0 : Math.min(100, current / target * 100);
+  const pred = current != null && current >= target ? null : predictDate(entries, target, now);
+  const predText = current != null && current >= target ? "Reached"
+    : pred instanceof Date ? fDate(pred)
+    : pred ?? "–";
+  return `<div class="target">
+    <div class="trow"><span>Target <strong class="gold">${target} kg</strong></span><span>${current == null ? "–" : `${f1(current)} kg now`}</span></div>
+    <div class="tbar" role="img" aria-label="${Math.round(pct)}% of target"><div style="width:${pct.toFixed(1)}%"></div></div>
+    <div class="trow small"><span>${togo > 0 ? `${f1(togo)} kg to go (${Math.round(pct)}%)` : "Target reached"}</span><span>Predicted <strong class="gold">${esc(predText)}</strong></span></div>
+  </div>`;
+}
+function renderProgress(d) {
+  const prog = progress(d.lifts.records, d.now);
+  const entriesFor = lift => d.lifts.records.filter(r => r.lift === lift);
+  const trended = prog.filter(p => !["single", "none"].includes(p.status));
+  const sparse = prog.filter(p => ["single", "none"].includes(p.status));
+  const cards = trended.map(p => `
+    <article class="card">
+      <div class="card-head"><h3>${esc(p.lift)}</h3>
+        <span class="pill">${ARROWS[p.status]} ${esc(p.change != null ? (p.change > 0 ? "+" : "") + p.change + "%" : LABELS[p.status])}</span></div>
+      <p class="small muted">${esc(LABELS[p.status])} · last 90 days best ${f1(p.recentBest)} kg, previous 90 days ${f1(p.priorBest)} kg</p>
+      ${lineChart(p.series, `${p.lift} best estimated 1RM`, TARGETS[p.lift])}
+      ${targetBlock(p.lift, entriesFor(p.lift), d.now)}
+    </article>`).join("");
+  const sparseCards = sparse.map(p => `
+    <article class="card">
+      <div class="card-head"><h3>${esc(p.lift)}</h3><span class="pill">${p.status === "none" ? "–" : "1 entry"}</span></div>
+      ${p.status === "none"
+        ? '<p class="empty">–</p>'
+        : `${barChart([short(p.lastDate)], [Math.round(p.last)], `${p.lift} single entry`, v => v + " kg")}
+           <p class="small muted">A trend line appears after a second entry.</p>`}
+      ${targetBlock(p.lift, entriesFor(p.lift), d.now)}
+    </article>`).join("");
+  const body = cards + sparseCards;
+  return `${issues(d)}
+    <p class="small muted wide">Trend = best estimated 1RM in the last 90 days, compared with the 90 days before that. Gold figures are your targets and predicted dates. A predicted date needs at least 3 entries over 2+ months with an upward trend; otherwise it shows a dash.</p>
+    ${body || '<section class="card"><p class="empty">Nothing to show yet.</p></section>'}`;
+}
+function ratioLabel(r) { return r == null ? "needs 28 days" : r < 0.8 ? "lighter week" : r <= 1.3 ? "steady build" : r <= 1.5 ? "building fast" : "sharp spike"; }
+// Colour guide from the load ratio (last 7 days ÷ last 28 days):
+// red above 1.5 (too high), orange 1.3–1.5 (heavy) and under 0.8 (light), green 0.8–1.3 (on track).
+function readinessFor(ratio) {
+  if (ratio == null) return { tone: "neutral", label: "Not enough data", advice: "Log 4 weeks of sessions to see your readiness." };
+  if (ratio > 1.5) return { tone: "red", label: "Too high", advice: "Drop intensity or volume today. Choose an easier session or add rest." };
+  if (ratio > 1.3) return { tone: "orange", label: "Heavy", advice: "Keep it moderate. Trim the hardest set or the longest piece." };
+  if (ratio >= 0.8) return { tone: "green", label: "On track", advice: "Train as planned. Your load is right for where you are." };
+  return { tone: "orange", label: "Light", advice: "You've eased off. A harder session is fine if you feel good." };
+}
+function renderLoad(d) {
+  const today = sod(d.now);
+  const days30 = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29));
+  const loadSeries = dailyTotals(d.sessions.records, s => sessionLoad(s) ?? 0, s => s.date, d.now, 36);
+  const volSeries = dailyTotals(d.lifts.records, l => l.weight * l.reps, l => l.date, d.now, 36);
+  const loadRoll = rolling(loadSeries.map(b => b.value)).slice(-30);
+  const volRoll = rolling(volSeries.map(b => b.value)).slice(-30);
+  const loadVals = loadSeries.slice(-30).map(b => Math.round(b.value));
+  const volVals = volSeries.slice(-30).map(b => Math.round(b.value));
+  const labels = days30.map(short);
+  const sessionCount = d.sessions.records.filter(s => days30.some(x => dayKey(x) === dayKey(s.date))).length;
+  const rest = d.sessions.records.length ? days30.filter(x => !d.sessions.records.some(s => dayKey(s.date) === dayKey(x))).length : 30;
+  const unscored = d.sessions.records.filter(s => days30.some(x => dayKey(x) === dayKey(s.date)) && sessionLoad(s) == null).length;
+  const total = sum(loadVals);
+  const acute = sum(loadSeries.slice(-7).map(b => b.value)) / 7;
+  const chronic = sum(loadSeries.slice(-28).map(b => b.value)) / 28;
+  const ratio = chronic > 0 ? Math.round(acute / chronic * 100) / 100 : null;
+  // Last week's load against the average of the four weeks before it.
+  const lastWeek = sum(loadSeries.slice(-7).map(b => b.value));
+  const priorWeeks = [2, 3, 4, 5].map(k => sum(loadSeries.slice(-7 * k, -7 * (k - 1))));
+  const priorAvg = avg(priorWeeks);
+  const readiness = readinessFor(ratio);
+  return `${issues(d)}
+    <section class="card readiness ${readiness.tone}">
+      <div class="card-head"><h3>Training readiness</h3><span class="pill">${esc(readiness.label)}</span></div>
+      <p class="big">${esc(readiness.advice)}</p>
+      <p class="small">Last 7 days: <strong>${Math.round(lastWeek)}</strong> load${priorAvg ? ` · your 4-week average: <strong>${Math.round(priorAvg)}</strong>` : ""}${ratio != null ? ` · ratio ${f1(ratio)}` : ""}.</p>
+      <p class="small muted">Green: train as planned. Orange: keep it moderate, or push a little if you've been light. Red: drop intensity or volume.</p>
+    </section>
+    <section class="grid-2">
+      ${tile("Total load", Math.round(total), "last 30 days")}${tile("Rest days", rest, "of the last 30")}
+      ${tile("Load ratio", f1(ratio), ratioLabel(ratio))}${tile("Sessions", sessionCount, "last 30 days")}
+    </section>
+    <section class="card"><div class="card-head"><h3>Daily load · 30 days</h3></div>
+      ${barLineChart(labels, loadVals, loadRoll, "Daily training load", v => Math.round(v))}
+      <p class="small muted" style="margin-top:6px">Load = minutes × effort (RPE), summed per day. Bars are daily load; the light line is the 7-day average.${unscored ? ` ${unscored} session(s) here lack minutes or effort and count as zero.` : ""}</p></section>
+    <section class="card"><div class="card-head"><h3>Lifting volume · 30 days</h3></div>
+      ${barLineChart(labels, volVals, volRoll, "Daily lifting volume", v => Math.round(v))}
+      <p class="small muted" style="margin-top:6px">Volume = weight × reps across that day's lift entries (kg). Bars are daily volume; the light line is the 7-day average.</p></section>
+    <section class="card wide"><div class="card-head"><h3>How to read it</h3></div>
+      <dl class="legend"><div><dt>Load ratio</dt> <dd>average daily load over the last 7 days ÷ the last 28 days. About 0.8–1.3 is a steady build; well above that is a sudden jump.</dd></div>
+      <div><dt>Note</dt> <dd>a rough guide to trends, not medical advice.</dd></div></dl></section>`;
+}
+
+// ─── Data, saving and refresh ────────────────────────────────────────────────
+const state = { tab: "stats", data: null, source: "snapshot", updatedAt: null, error: null, loading: false, benchText: null };
+
+function build(liftsText, sessionsText, benchText = BENCH_CSV) {
+  const now = new Date();
+  const lifts = parseLifts(liftsText), sessions = parseSessions(sessionsText), bench = parseBench(benchText);
+  return { lifts, sessions, bench, now, summary: summarize(sessions.records, lifts.records, now) };
+}
+function readSaved() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
+function writeSaved(obj) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(obj)); } catch { /* storage blocked: ignore */ } }
+
+// Reads one tab straight from Google as CSV. Google answers with a web page if the sheet isn't shared.
+async function getCsv(tab) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
+    const r = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    if (!r.ok) throw new Error(`status ${r.status}`);
+    const text = await r.text();
+    if (/^\s*[<{]/.test(text)) throw new Error("not shared");
+    return text;
+  } finally { clearTimeout(timer); }
+}
+function describe(err) {
+  if (err?.name === "AbortError") return "Google Sheets took too long to respond";
+  if (err?.message === "not shared") return 'The sheet isn\'t shared for viewing. In Google Sheets choose Share → General access → "Anyone with the link"';
+  return "Couldn't reach Google Sheets. Check your connection";
+}
+const timeLabel = ts => new Date(ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+
+async function refresh() {
+  if (state.loading) return;
+  state.loading = true; render();
+  try {
+    const [liftsText, sessionsText, benchFetched] = await Promise.all([
+      getCsv(TABS.lifts), getCsv(TABS.sessions), getCsv(TABS.bench).catch(() => null),
+    ]);
+    // If the benchmark tab can't be read, keep the last benchmark data rather than failing the whole refresh.
+    const benchText = benchFetched ?? state.benchText ?? BENCH_CSV;
+    state.benchText = benchText;
+    state.data = build(liftsText, sessionsText, benchText);
+    state.source = "live"; state.updatedAt = Date.now(); state.error = null;
+    writeSaved({ savedAt: state.updatedAt, lifts: liftsText, sessions: sessionsText, bench: benchText });
+  } catch (err) {
+    const fallback = state.source === "live" ? "the last live reading" : state.source === "saved" ? "your last saved copy" : "the built-in copy";
+    state.error = `${describe(err)}. Showing ${fallback}.`;
+  } finally {
+    state.loading = false; render();
+  }
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────────────
+// ─── Benchmark library: the girl workouts, shown on the Stats tab ───────────
+// Taken from the library's descriptions. Items marked check need confirming on crossfit.com before you rely on them.
+const WORKOUTS = [
+  { name: "Angie", format: "For time", movements: "100 pull-ups · 100 push-ups · 100 sit-ups · 100 air squats", rx: "No weights" },
+  { name: "Barbara", format: "For time, 5 rounds", movements: "20 pull-ups · 30 push-ups · 40 sit-ups · 50 air squats per round", rx: "No weights", check: "rest between rounds needs checking" },
+  { name: "Chelsea", format: "EMOM 30 min, score rounds", movements: "5 pull-ups · 10 push-ups · 15 air squats each minute", rx: "No weights", cap: "30 min" },
+  { name: "Cindy", format: "AMRAP 20 min, score rounds and reps", movements: "5 pull-ups · 10 push-ups · 15 air squats", rx: "No weights", cap: "20 min" },
+  { name: "Diane", format: "For time, 21-15-9", movements: "Deadlifts · handstand push-ups", rx: "102 kg" },
+  { name: "Elizabeth", format: "For time, 21-15-9", movements: "Cleans · ring dips", rx: "61 kg" },
+  { name: "Fran", format: "For time, 21-15-9", movements: "Thrusters · pull-ups", rx: "43 kg" },
+  { name: "Grace", format: "For time", movements: "30 clean and jerks", rx: "61 kg" },
+  { name: "Helen", format: "For time, 3 rounds", movements: "400 m run · 21 kettlebell swings · 12 pull-ups", rx: "24 kg kettlebells", check: "kettlebell weights need checking" },
+  { name: "Isabel", format: "For time", movements: "30 snatches", rx: "61 kg" },
+  { name: "Jackie", format: "For time", movements: "1000 m row · 50 thrusters · 30 pull-ups", rx: "20 kg barbell" },
+  { name: "Karen", format: "For time", movements: "150 wall-ball shots", rx: "9 kg balls", check: "ball weights need checking" },
+  { name: "Annie", format: "For time, 50-40-30-20-10", movements: "Double-unders · sit-ups", rx: "No weights", check: "unverified" },
+  { name: "Mary", format: "AMRAP 20 min, score rounds and reps", movements: "5 handstand push-ups · 10 pistols · 15 pull-ups", rx: "No weights", cap: "20 min", check: "movements need checking" },
+  { name: "Nancy", format: "For time, 5 rounds", movements: "400 m run · 15 overhead squats", rx: "43 kg", check: "weights need checking" },
+  { name: "Amanda", format: "For time, 9-7-5", movements: "Muscle-ups · squat snatches", rx: "61 kg", check: "unverified" },
+  { name: "Kelly", format: "For time, 5 rounds", movements: "400 m run · 30 box jumps · 30 wall-ball shots", rx: "" },
+];
+
+function render() {
+  document.querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === state.tab)));
+  const view = document.getElementById("view");
+  view.classList.toggle("progress-view", state.tab === "progress");
+  const views = { stats: renderStats, trends: renderTrends, progress: renderProgress, load: renderLoad };
+  const d = state.data ? { ...state.data, now: new Date() } : null;
+  view.innerHTML = (d ? views[state.tab](d) : '<section class="card"><p class="empty">Loading…</p></section>') + (state.error ? `<div class="notice wide">${esc(state.error)}</div>` : "");
+  const src = document.getElementById("source");
+  const btn = document.getElementById("refresh");
+  btn.disabled = state.loading;
+  if (state.loading) src.textContent = "Refreshing…";
+  else if (state.source === "live") src.textContent = `Live · ${timeLabel(state.updatedAt)}`;
+  else if (state.source === "saved") src.textContent = `Saved copy · ${timeLabel(state.updatedAt)}`;
+  else src.textContent = `Built-in copy · ${SNAPSHOT_DATE}`;
+}
+
+// ─── Start-up ─────────────────────────────────────────────────────────────────
+// (The workout search listener is registered above, next to the Workouts tab.)
+document.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", () => { state.tab = b.dataset.tab; render(); window.scrollTo({ top: 0 }); }));
+document.getElementById("refresh").addEventListener("click", refresh);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (!state.updatedAt || Date.now() - state.updatedAt > REFRESH_MS)) refresh();
+});
+setInterval(() => { if (!document.hidden) refresh(); }, REFRESH_MS);
+
+// Show the last good copy straight away, then fetch the live sheet.
+const saved = readSaved();
+try {
+  if (saved?.lifts) {
+    state.benchText = saved.bench ?? null;
+    state.data = build(saved.lifts, saved.sessions, saved.bench ?? BENCH_CSV);
+    state.source = "saved"; state.updatedAt = saved.savedAt;
+  } else throw new Error("no saved copy");
+} catch {
+  state.data = build(LIFT_CSV, SESSION_CSV, BENCH_CSV);
+  state.source = "snapshot";
+}
+render();
+refresh();
+</script>
+</body>
+</html>
